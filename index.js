@@ -281,7 +281,7 @@ setInterval(() => {
             unSubmitted = "i didn't hear from" + unSubmitted
         }
 
-        submittedCheckIn.forEach(submit => {
+        submittedCheckOut.forEach(submit => {
             checkOutMessage += '> ' + submit.user.name + '\n' + '> ' + submit.checkOutMessage + '( ' + submit.checkOutMessageTime + '  )\n' + '** ** \n';
             blockerMessage += '> ' + submit.user.name + '\n' + '> ' + submit.blockerMessage + '( ' + submit.blockerMessageTime + '  )\n' + '** ** \n';
         });
