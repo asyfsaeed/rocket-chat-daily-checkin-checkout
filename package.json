@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Chatbot for RocketChat",
   "scripts": {
-    "bot": "node index.js"
+    "chatbot": "node index.js"
   },
   "dependencies": {
     "@rocket.chat/sdk": "^0.2.9",
