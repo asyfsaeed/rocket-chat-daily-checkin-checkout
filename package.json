@@ -1,7 +1,7 @@
 {
-  "name": "bahaso-rocket-chat",
+  "name": "rocket-chat-daily-checkin-checkout",
   "version": "0.0.1",
-  "description": "Chatbot for Bahaso's RocketChat",
+  "description": "Chatbot for RocketChat",
   "scripts": {
     "bot": "node index.js"
   },
@@ -14,11 +14,12 @@
     "node": "9.x"
   },
   "repository": {
-    "url": "https://github.com/bahaso/rocket-daily-standup.git"
+    "url": "https://github.com/bahaso/rocket-chat-daily-checkin-checkout.git"
   },
   "license": "MIT",
   "keywords": [
-    "bahaso",
+    "dailystandup",
+    "chatbot",
     "rocketchat"
   ]
 }

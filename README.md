@@ -1,5 +1,5 @@
 
-# rocket-daily-standup
+# rocket-chat-daily-checkin-checkout
 
 ## Project setup
 1. Run this command
@@ -27,8 +27,3 @@ npm run debug
 ```
 npm run bot
 ```
-
-
-### Usefull links
-- [Rocket.Chat SDK](https://github.com/RocketChat/Rocket.Chat.js.SDK)
-- [Rocket.Chat API](https://rocket.chat/docs/developer-guides/rest-api/)

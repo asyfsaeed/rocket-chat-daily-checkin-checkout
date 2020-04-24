@@ -1,273 +1,310 @@
-require('dotenv').config()
+require('dotenv').config();
 
-const rocket = require('@rocket.chat/sdk')
-const respmap  = require('./reply')
-const moment = require('moment')
+const rocket = require('@rocket.chat/sdk'),
+    respmap = require('./reply'),
+    moment = require('moment');
 
-const HOST = process.env.ROCKETCHAT_URL
-const USER = process.env.ROCKETCHAT_USER
-const PASS = process.env.ROCKETCHAT_PASSWORD
-const BOTNAME = process.env.BOT_NAME
-const SSL = process.env.ROCKETCHAT_USE_SSL
-const ROOMS = [process.env.ROCKETCHAT_ROOM]
+
+//Envoirment Variables Reading
+const HOST = process.env.ROCKETCHAT_URL,
+    USER = process.env.ROCKETCHAT_USER,
+    PASS = process.env.ROCKETCHAT_PASSWORD,
+    BOTNAME = process.env.BOT_NAME,
+    SSL = process.env.ROCKETCHAT_USE_SSL,
+    ROOMS = [process.env.ROCKETCHAT_ROOM];
+
 let time = {
-    dialog: process.env.BOT_TIME_DIALOG,
-    publish: process.env.BOT_TIME_PUBLISH
+    dialog: process.env.BOT_TIME_DIALOG_CHECKIN,
+    publish: process.env.BOT_TIME_PUBLISH_CHECKIN,
+    dialog2: process.env.BOT_TIME_DIALOG_CHECKOUT,
+    publish2: process.env.BOT_TIME_PUBLISH_CHECKOUT
 }
-let channelId=''
-let users = []
-let submited = []
-let indexCount = 0
+let channelId = '',
+    users = [],
+    submittedCheckIn = [],
+    submittedCheckOut = [],
+    UserData;
 
-let myuserid
+const runBot = async () => {
+    //connection to workspace
+    await rocket.driver.connect({host: HOST, useSsl: SSL});
 
-const runbot = async () => {
-    const conn = await rocket.driver.connect( { host: HOST, useSsl: SSL})
-    myuserid = await rocket.driver.login({username: USER, password: PASS})
-    const roomsJoined = await rocket.driver.joinRooms(ROOMS)
+    UserData = await rocket.driver.login({username: USER, password: PASS});
 
-    const subscribed = await rocket.driver.subscribeToMessages()
-    const msgloop = await rocket.driver.reactToMessages( processMessages )
+    await rocket.driver.joinRooms(ROOMS);
+
+    await rocket.driver.subscribeToMessages();
+
+    await rocket.driver.reactToMessages(processMessages);
 }
-const processMessages = async(err, message, messageOptions) => {
 
+const processMessages = async (err, message, messageOptions) => {
 
+    if (!err && moment().format('dddd') != 'Sunday') {
 
-    if (!err && moment().format('dddd') != 'Saturday' && moment().format('dddd') != 'Sunday') {
+        if (message.u._id === UserData) return;
 
-        if (message.u._id === myuserid) return
+        const roomName = await rocket.driver.getDirectMessageRoomId(message.u.username)
 
-        const roomname = await rocket.driver.getDirectMessageRoomId(message.u.username)
+        if (message.msg.toLowerCase() && message.rid == roomName) {
 
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
 
+            console.log('Got Direct Message from ' + message.u.username);
 
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
 
-        if (message.msg.toLowerCase() && message.rid == roomname) {
+            let response;
 
-            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+            let inComingMessage = message.msg.toLowerCase();
 
-            console.log('get dm from '+message.u.username)
+            let currentTime = moment().format('HH:mm:ss');
 
-            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+            if (currentTime > time.dialog && currentTime < time.publish) {
+                let indexSubmit = findInCheckIn(message.u.username);
 
+                if (indexSubmit === -1) {
+                    submittedCheckIn.push({
+                        user: message.u,
+                        checkInMessage: inComingMessage,
+                        checkInMessageTime: moment().utcOffset(300).format('HH:mm:ss'),
+                    });
 
+                    response = respmap.blocking;
+                }
+            } else if (currentTime > time.dialog2 && currentTime < time.publish2) {
+                let indexSubmit = findInCheckOut(message.u.username);
 
-            let response
+                if (indexSubmit === -1) {
+                    submittedCheckOut.push({
+                        user: message.u,
+                        checkOutMessage: inComingMessage,
+                        checkOutMessageTime: moment().utcOffset(300).format('HH:mm:ss'),
+                        blockerMessage: '',
+                        blockerMessageTime: ''
+                    });
 
-            let inpmsg = message.msg.toLowerCase();
-
-
-            let indexSubmit = findInSubmit(message.u.username);
-
-            if (indexSubmit === -1) {
-                submited.push({
-
-                    user: message.u,
-
-                    message1: inpmsg,
-                    message1Time: moment().utcOffset(240).format('HH:mm:ss'),
-                    message2: '',
-	           message2Time: '',		
-
-                    message3: '',
-			message3Time:''
-
-                });
-                response = respmap.yesterday;
-            } else {
-                let indexSubmit = findInSubmit(message.u.username);
-
-                if (!submited[indexSubmit].message2) {
-                    submited[indexSubmit].message2 = inpmsg;
-		    submited[indexSubmit].message2Time = moment().utcOffset(240).format('HH:mm:ss');
                     response = respmap.today;
-                } else if (!submited[indexSubmit].message3) {
-                    submited[indexSubmit].message3 = inpmsg;
-                     submited[indexSubmit].message3Time = moment().utcOffset(240).format('HH:mm:ss');
+                } else if (!submittedCheckOut[indexSubmit].blockerMessage) {
+                    submittedCheckOut[indexSubmit].blockerMessage = inComingMessage;
+                    submittedCheckOut[indexSubmit].blockerMessageTime = moment().utcOffset(240).format('HH:mm:ss');
+                    response = respmap.blocking;
+                }
+            } else if (currentTime > time.publish && currentTime < time.dialog2) {
+                rocket.driver.sendMessage({
+
+                    rid: channelId,
+
+                    msg: 'Hey HR, @' + message.u.name + ' has submitted a late check-in\n' +
+
+                        '**1. What will you do today?**\n' +
+
+                        '> ' + inComingMessage + '\n'
+                }).then(response => {
+
                     response = respmap.blocking;
 
+                }).catch(error => {
 
-                    if (moment().format('HH:mm:ss') > time.publish) {
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
 
-                        let submit = submited[indexSubmit]
+                    console.log('Error send message to channel');
 
+                    console.log(error);
 
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
 
-                        rocket.driver.sendMessage({
+                });
+            } else if (currentTime > time.publish2 && currentTime < time.publish) {
+                rocket.driver.sendMessage({
 
-                            rid: channelId,
+                    rid: channelId,
 
-                            msg: 'Hey @here, @'+submit.user.name+' has submited a check-in\n'+
+                    msg: 'Hey HR, @' + message.u.name + ' has submitted a check-out\n' +
 
-                                '**1. What did you do since yesterday?**\n'+
+                        '**1. What did you do today?**\n' +
 
-                                '> '+submit.message1+'\n'+
+                        '> ' + inComingMessage + '\n'
+                }).then(response => {
 
-                                '** ** \n'+
+                    response = respmap.blocking;
 
-                                '**2. What will you do today?**\n'+
+                }).catch(error => {
 
-                                '> '+submit.message2+'\n'+
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
 
-                                '** ** \n'+
+                    console.log('Error send message to channel')
 
-                                '**3. Anything is blocking your progress?**\n'+
+                    console.log(error)
 
-                                '> '+submit.message3+'\n'
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
 
-                        })
-
-                            .then(response => {
-
-                                b.respond('Thank you 👋')
-
-                            })
-
-                            .catch(error => {
-
-                                console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-
-                                console.log('Error send message to channel')
-
-                                console.log(error)
-
-                                console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-
-                            })
-
-                    }
-
-                }   else{
-
-                    response = message.u.username +
-
-                        ', You have submitted your checkin today. Please come tomorrow for checkin. Thank you';
-                }
-
-              
-
-
-
+                });
             }
-		const sentmsg = await rocket.driver.sendToRoom(response, roomname)
+
+            await rocket.driver.sendToRoom(response, roomName);
+
         }
-
-
-
     }
 
 }
 
 function getChannelMemberList() {
-    console.log('channel ID', channelId)
     rocket.api.get('channels.members', {
         roomId: channelId
     }).then(response => {
         users = [];
-        //onsole.log('no members')
-        //console.log(response)
         response.members.forEach(user => {
-		if(!user.username.toLowerCase().includes('bot')) {
-                users.push(user)
+            if (!user.username.toLowerCase().includes('bot')) {
+                users.push(user);
             }
         })
-    })
-    .catch(error => {
-        console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-        console.log('Error when get channel member list :')
-        console.log(error)
-        console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    })
+    }).catch(error => {
+        console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+        console.log('Error when get channel member list :');
+        console.log(error);
+        console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+    });
 }
 
-function findInSubmit(username){
-    let response = submited.find(submit => {
+function findInCheckIn(username) {
+    let response = submittedCheckIn.find(submit => {
         return submit.user.username == username
-    })
-    return submited.indexOf(response)
+    });
+    return submittedCheckIn.indexOf(response);
+}
+
+function findInCheckOut(username) {
+    let response = submittedCheckOut.find(submit => {
+        return submit.user.username == username
+    });
+    return submittedCheckOut.indexOf(response);
 }
 
 rocket.api.get('channels.list')
-.then(response => {
-      //console.log('i am her')
-	//onsole.log(response)
-	console.log(ROOMS, 'ROOMS');
-
-	response.channels.forEach(channel => {
-	console.log('channel name', channel.name);
-		console.log(ROOMS.indexOf(channel.name))
-		if (ROOMS.indexOf(channel.name) >= 0){
-            channelId = channel._id
-        }
-    })
-    getChannelMemberList()
-})
+    .then(response => {
+        response.channels.forEach(channel => {
+            console.log(ROOMS.indexOf(channel.name))
+            if (ROOMS.indexOf(channel.name) >= 0) {
+                channelId = channel._id
+            }
+        });
+        getChannelMemberList();
+    });
 
 setInterval(() => {
-    if(moment().format('HH:mm:ss') == time.dialog && moment().format('dddd') != 'Saturday' && moment().format('dddd') != 'Sunday') {
+    if (moment().format('HH:mm:ss') == time.dialog && moment().format('dddd') != 'Sunday') {
         users.forEach(user => {
             if (user.username) {
                 rocket.driver.getDirectMessageRoomId(user.username)
-                .then(userRoomId => {
-                    rocket.driver.sendMessage({
-                        rid: userRoomId,
-                        msg: 'Hi, '+user.name+'. What did you do since yesterday?'
-                    })  
-                })
-                .catch(error => {
-                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-                    console.log('Error when send DM to ' +user.name)
-                    console.log(error)
-                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-                })
+                    .then(userRoomId => {
+                        rocket.driver.sendMessage({
+                            rid: userRoomId,
+                            msg: 'Hi, ' + user.name + '. What will you do today?'
+                        });
+                    }).catch(error => {
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+                    console.log('Error when send DM to ' + user.name);
+                    console.log(error);
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+                });
+            }
+        });
+    }
+
+    if (moment().format('HH:mm:ss') == time.dialog2 && moment().format('dddd') != 'Sunday') {
+        users.forEach(user => {
+            if (user.username) {
+                rocket.driver.getDirectMessageRoomId(user.username)
+                    .then(userRoomId => {
+                        rocket.driver.sendMessage({
+                            rid: userRoomId,
+                            msg: 'Hi, ' + user.name + '. What did you do today?'
+                        });
+                    }).catch(error => {
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+                    console.log('Error when send DM to ' + user.name);
+                    console.log(error);
+                    console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+                });
             }
         })
     }
 
-    if(moment().format('HH:mm:ss') == time.publish && moment().format('dddd') != 'Saturday' && moment().format('dddd') != 'Sunday') {
-        let message1 = ''
-        let message2 = ''
-        let message3 = ''
-        let unsubmited = ''
+    if (moment().format('HH:mm:ss') == time.publish && moment().format('dddd') != 'Sunday') {
+        let checkInMessage = '',
+            unSubmitted = '';
+
         users.forEach(user => {
-            if (findInSubmit(user.username) < 0) {
-                unsubmited+=' @'+user.username
+            if (findInCheckIn(user.username) < 0) {
+                unSubmitted += ' @' + user.username
             }
         })
 
-        if (unsubmited.length > 0) {
-            unsubmited = "i didn't hear from"+unsubmited
+        if (unSubmitted.length > 0) {
+            unSubmitted = "i didn't hear from" + unSubmitted
         }
-        
-        submited.forEach(submit => {
-            message1+='> '+submit.user.name+'\n'+'> '+submit.message1+'( '+submit.message1Time + '  )\n'+'** ** \n'
-            message2+='> '+submit.user.name+'\n'+'> '+submit.message2+'( '+submit.message2Time + '  )\n'+'** ** \n'
-            message3+='> '+submit.user.name+'\n'+'> '+submit.message3+'( '+submit.message3Time + '  )\n'+'** ** \n'
-        })
+
+        submittedCheckIn.forEach(submit => {
+            checkInMessage += '> ' + submit.user.name + '\n' + '> ' + submit.checkInMessage + '( ' + submit.checkInMessageTime + '  )\n' + '** ** \n';
+        });
 
         rocket.driver.sendMessage({
             rid: channelId,
-            msg: 'Hey, @here our daily stand-up team :coffee:\n'+
-                 '**1. What did you do since yesterday?**\n'+
-                 message1+
-                 '**2. What will you do today?**\n'+
-                 message2+
-                 '**3. Anything is blocking your progress?**\n'+
-                 message3+
-                 unsubmited
-        })
-        .then(response => {
-            submited = []
-        })
-        .catch(error => {
-            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-            console.log('Error when sending message to channel :')
-            console.log(error)
-            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+            msg: 'Hey, @here our check-in for today :coffee:\n' +
+                '**1. What will you do today?**\n' +
+                checkInMessage +
+                unSubmitted
+        }).then(response => {
+            submittedCheckIn = [];
+        }).catch(error => {
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+            console.log('Error when sending message to channel :');
+            console.log(error);
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+        });
+
+    }
+
+    if (moment().format('HH:mm:ss') == time.publish2 && moment().format('dddd') != 'Sunday') {
+        let checkOutMessage = '',
+            unSubmitted = '',
+            blockerMessage = ''
+
+        users.forEach(user => {
+            if (findInCheckOut(user.username) < 0) {
+                unSubmitted += ' @' + user.username
+            }
+        });
+
+        if (unSubmitted.length > 0) {
+            unSubmitted = "i didn't hear from" + unSubmitted
+        }
+
+        submittedCheckIn.forEach(submit => {
+            checkOutMessage += '> ' + submit.user.name + '\n' + '> ' + submit.checkOutMessage + '( ' + submit.checkOutMessageTime + '  )\n' + '** ** \n';
+            blockerMessage += '> ' + submit.user.name + '\n' + '> ' + submit.blockerMessage + '( ' + submit.blockerMessageTime + '  )\n' + '** ** \n';
+        });
+
+        rocket.driver.sendMessage({
+            rid: channelId,
+            msg: 'Hey, @here our check-out for today:\n' +
+                '**1. What did you do today?**\n' +
+                checkOutMessage +
+                '**2. Anything is blocking your progress?**\n' +
+                blockerMessage +
+                blockerMessage
+        }).then(response => {
+            submittedCheckOut = [];
+        }).catch(error => {
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
+            console.log('Error when sending message to channel :');
+            console.log(error);
+            console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
         })
 
     }
 }, 1000)
 
 
-runbot()
+runBot();
