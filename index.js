@@ -70,7 +70,7 @@ const processMessages = async (err, message, messageOptions) => {
                         checkInMessageTime: moment().utcOffset(300).format('HH:mm:ss'),
                     });
 
-                    response = respmap.blocking;
+                    response = respmap.thank;
                 }
             } else if (currentTime > time.dialog2 && currentTime < time.publish2) {
                 let indexSubmit = findInCheckOut(message.u.username);
@@ -84,11 +84,11 @@ const processMessages = async (err, message, messageOptions) => {
                         blockerMessageTime: ''
                     });
 
-                    response = respmap.today;
+                    response = respmap.blocking;
                 } else if (!submittedCheckOut[indexSubmit].blockerMessage) {
                     submittedCheckOut[indexSubmit].blockerMessage = inComingMessage;
                     submittedCheckOut[indexSubmit].blockerMessageTime = moment().utcOffset(240).format('HH:mm:ss');
-                    response = respmap.blocking;
+                    response = respmap.thank;
                 }
             } else if (currentTime > time.publish && currentTime < time.dialog2) {
                 rocket.driver.sendMessage({
@@ -102,7 +102,7 @@ const processMessages = async (err, message, messageOptions) => {
                         '> ' + inComingMessage + '\n'
                 }).then(response => {
 
-                    response = respmap.blocking;
+                    response = respmap.thank;
 
                 }).catch(error => {
 
@@ -127,7 +127,7 @@ const processMessages = async (err, message, messageOptions) => {
                         '> ' + inComingMessage + '\n'
                 }).then(response => {
 
-                    response = respmap.blocking;
+                    response = respmap.thank;
 
                 }).catch(error => {
 
