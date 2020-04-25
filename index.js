@@ -234,7 +234,7 @@ setInterval(() => {
         })
     }
 
-    if (moment().format('HH:mm:ss') == time.publish && moment().format('dddd') != 'Sunday') {
+    if (moment().format('HH:mm:ss') == time.publish && moment().format('dddd') != 'Sunday' && submittedCheckIn.length > 0) {
         let checkInMessage = '',
             unSubmitted = '';
 
@@ -269,7 +269,7 @@ setInterval(() => {
 
     }
 
-    if (moment().format('HH:mm:ss') == time.publish2 && moment().format('dddd') != 'Sunday') {
+    if (moment().format('HH:mm:ss') == time.publish2 && moment().format('dddd') != 'Sunday' && submittedCheckOut.length > 0) {
         let checkOutMessage = '',
             unSubmitted = '',
             blockerMessage = ''
@@ -296,7 +296,7 @@ setInterval(() => {
                 checkOutMessage +
                 '**2. Anything is blocking your progress?**\n' +
                 blockerMessage +
-                blockerMessage
+                unSubmitted
         }).then(response => {
             submittedCheckOut = [];
         }).catch(error => {
