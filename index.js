@@ -193,7 +193,9 @@ rocket.api.get('channels.list')
     });
 
 setInterval(() => {
+    console.log('current Time', moment().format('HH:mm:ss'));
     if (moment().format('HH:mm:ss') == time.dialog && moment().format('dddd') != 'Sunday') {
+        console.log('Ready for check ins?');
         users.forEach(user => {
             if (user.username) {
                 rocket.driver.getDirectMessageRoomId(user.username)
@@ -213,6 +215,7 @@ setInterval(() => {
     }
 
     if (moment().format('HH:mm:ss') == time.dialog2 && moment().format('dddd') != 'Sunday') {
+        console.log('Ready for check outs?');
         users.forEach(user => {
             if (user.username) {
                 rocket.driver.getDirectMessageRoomId(user.username)
