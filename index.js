@@ -194,6 +194,7 @@ rocket.api.get('channels.list')
 
 setInterval(() => {
     console.log('current Time', moment().format('HH:mm:ss'));
+    console.log('time.dialog', time.dialog)
     if (moment().format('HH:mm:ss') == time.dialog && moment().format('dddd') != 'Sunday') {
         console.log('Ready for check ins?');
         users.forEach(user => {
